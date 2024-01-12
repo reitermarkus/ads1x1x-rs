@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Removed
 - Removed `I2cInterface`.
+- Removed `DynamicOneShot` for simplicity.
 
 ## [0.2.2] - 2021-07-29
 
