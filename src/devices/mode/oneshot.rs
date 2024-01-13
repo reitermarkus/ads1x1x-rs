@@ -1,7 +1,7 @@
 //! Common functions
 use crate::{
-    conversion, devices::OperatingMode, mode, Ads1x1x, BitFlags, ChannelId,
-    Config, Error, ModeChangeError, Register,
+    conversion, devices::OperatingMode, mode, Ads1x1x, BitFlags, ChannelId, Config, Error,
+    ModeChangeError, Register,
 };
 use core::marker::PhantomData;
 
