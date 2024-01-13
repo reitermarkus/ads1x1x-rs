@@ -2,8 +2,6 @@
 
 use core::marker::PhantomData;
 
-use crate::{private, ChannelSelection};
-
 /// Errors in this crate
 #[derive(Debug)]
 pub enum Error<E> {
