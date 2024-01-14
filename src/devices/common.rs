@@ -13,21 +13,6 @@ macro_rules! impl_common_features {
                 let config = self.read_reg_u16::<Config>()?;
                 Ok(!config.contains(Config::OS))
             }
-
-            /// Resets the internal state of this driver to the default values.
-            ///
-            /// *Note:* This does not alter the state or configuration of the device.
-            ///
-            /// This resets the cached configuration register value in this driver to
-            /// the power-up (reset) configuration of the device.
-            ///
-            /// This needs to be called after performing a reset of the device, for
-            /// example through an I²C general call reset which was not done
-            /// through this driver to ensure that the configurations in the device
-            /// and in the driver match.
-            pub fn reset_internal_driver_state(&mut self) {
-                self.config = Config::default();
-            }
         }
     };
 }
