@@ -50,15 +50,15 @@ macro_rules! impl_common_features {
                 Ok(!config.is_high(BitFlags::OS))
             }
 
-            /// Reset the internal state of this driver to the default values.
+            /// Resets the internal state of this driver to the default values.
             ///
             /// *Note:* This does not alter the state or configuration of the device.
             ///
             /// This resets the cached configuration register value in this driver to
             /// the power-up (reset) configuration of the device.
             ///
-            /// This needs to be called after performing a reset on the device, for
-            /// example through an I2C general-call Reset command, which was not done
+            /// This needs to be called after performing a reset of the device, for
+            /// example through an I²C general call reset which was not done
             /// through this driver to ensure that the configurations in the device
             /// and in the driver match.
             pub fn reset_internal_driver_state(&mut self) {
