@@ -1,6 +1,6 @@
 //! Type definitions.
 
-use crate::BitFlags as BF;
+use crate::Config;
 
 /// Errors in this crate
 #[derive(Debug, PartialEq)]
@@ -32,16 +32,37 @@ pub enum DataRate12Bit {
 }
 
 impl DataRate12Bit {
-    pub(crate) fn configure(self, cfg: &mut Config) {
-        *cfg = match self {
-            Self::Sps128 => cfg.with_low(BF::DR2).with_low(BF::DR1).with_low(BF::DR0),
-            Self::Sps250 => cfg.with_low(BF::DR2).with_low(BF::DR1).with_high(BF::DR0),
-            Self::Sps490 => cfg.with_low(BF::DR2).with_high(BF::DR1).with_low(BF::DR0),
-            Self::Sps920 => cfg.with_low(BF::DR2).with_high(BF::DR1).with_high(BF::DR0),
-            Self::Sps1600 => cfg.with_high(BF::DR2).with_low(BF::DR1).with_low(BF::DR0),
-            Self::Sps2400 => cfg.with_high(BF::DR2).with_low(BF::DR1).with_high(BF::DR0),
-            Self::Sps3300 => cfg.with_high(BF::DR2).with_high(BF::DR1).with_low(BF::DR0),
-        };
+    pub(crate) fn configure(self, cfg: Config) -> Config {
+        match self {
+            Self::Sps128 => cfg
+                .difference(Config::DR2)
+                .difference(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps250 => cfg
+                .difference(Config::DR2)
+                .difference(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps490 => cfg
+                .difference(Config::DR2)
+                .union(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps920 => cfg
+                .difference(Config::DR2)
+                .union(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps1600 => cfg
+                .union(Config::DR2)
+                .difference(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps2400 => cfg
+                .union(Config::DR2)
+                .difference(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps3300 => cfg
+                .union(Config::DR2)
+                .union(Config::DR1)
+                .difference(Config::DR0),
+        }
     }
 }
 
@@ -68,17 +89,38 @@ pub enum DataRate16Bit {
 }
 
 impl DataRate16Bit {
-    pub(crate) fn configure(self, cfg: &mut Config) {
-        *cfg = match self {
-            Self::Sps8 => cfg.with_low(BF::DR2).with_low(BF::DR1).with_low(BF::DR0),
-            Self::Sps16 => cfg.with_low(BF::DR2).with_low(BF::DR1).with_high(BF::DR0),
-            Self::Sps32 => cfg.with_low(BF::DR2).with_high(BF::DR1).with_low(BF::DR0),
-            Self::Sps64 => cfg.with_low(BF::DR2).with_high(BF::DR1).with_high(BF::DR0),
-            Self::Sps128 => cfg.with_high(BF::DR2).with_low(BF::DR1).with_low(BF::DR0),
-            Self::Sps250 => cfg.with_high(BF::DR2).with_low(BF::DR1).with_high(BF::DR0),
-            Self::Sps475 => cfg.with_high(BF::DR2).with_high(BF::DR1).with_low(BF::DR0),
-            Self::Sps860 => cfg.with_high(BF::DR2).with_high(BF::DR1).with_high(BF::DR0),
-        };
+    pub(crate) fn configure(self, cfg: Config) -> Config {
+        match self {
+            Self::Sps8 => cfg
+                .difference(Config::DR2)
+                .difference(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps16 => cfg
+                .difference(Config::DR2)
+                .difference(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps32 => cfg
+                .difference(Config::DR2)
+                .union(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps64 => cfg
+                .difference(Config::DR2)
+                .union(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps128 => cfg
+                .union(Config::DR2)
+                .difference(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps250 => cfg
+                .union(Config::DR2)
+                .difference(Config::DR1)
+                .union(Config::DR0),
+            Self::Sps475 => cfg
+                .union(Config::DR2)
+                .union(Config::DR1)
+                .difference(Config::DR0),
+            Self::Sps860 => cfg.union(Config::DR2).union(Config::DR1).union(Config::DR0),
+        }
     }
 }
 
@@ -169,6 +211,37 @@ pub enum FullScaleRange {
     Within0_256V,
 }
 
+impl FullScaleRange {
+    pub(crate) fn configure(self, config: Config) -> Config {
+        match self {
+            Self::Within6_144V => config
+                .difference(Config::PGA2)
+                .difference(Config::PGA1)
+                .difference(Config::PGA0),
+            Self::Within4_096V => config
+                .difference(Config::PGA2)
+                .difference(Config::PGA1)
+                .union(Config::PGA0),
+            Self::Within2_048V => config
+                .difference(Config::PGA2)
+                .union(Config::PGA1)
+                .difference(Config::PGA0),
+            Self::Within1_024V => config
+                .difference(Config::PGA2)
+                .union(Config::PGA1)
+                .union(Config::PGA0),
+            Self::Within0_512V => config
+                .union(Config::PGA2)
+                .difference(Config::PGA1)
+                .difference(Config::PGA0),
+            Self::Within0_256V => config
+                .union(Config::PGA2)
+                .difference(Config::PGA1)
+                .union(Config::PGA0),
+        }
+    }
+}
+
 /// A slave address.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum SlaveAddr {
@@ -195,35 +268,6 @@ impl SlaveAddr {
             SlaveAddr::Sda => 0b100_1010,
             SlaveAddr::Scl => 0b100_1011,
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Config {
-    pub(crate) bits: u16,
-}
-
-impl Config {
-    pub(crate) fn is_high(&self, mask: u16) -> bool {
-        (self.bits & mask) != 0
-    }
-
-    pub(crate) fn with_high(&self, mask: u16) -> Self {
-        Config {
-            bits: self.bits | mask,
-        }
-    }
-
-    pub(crate) fn with_low(&self, mask: u16) -> Self {
-        Config {
-            bits: self.bits & !mask,
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config { bits: 0x8583 }
     }
 }
 
