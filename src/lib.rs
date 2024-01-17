@@ -202,17 +202,19 @@
 //! ```
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 use core::marker::PhantomData;
 
 pub mod channel;
-pub use channel::ChannelId;
+pub use channel::{Channel, ChannelId};
 mod devices;
+mod error;
+pub use error::Error;
 mod types;
 pub use types::{
     ComparatorLatching, ComparatorMode, ComparatorPolarity, ComparatorQueue, DataRate12Bit,
-    DataRate16Bit, Error, FullScaleRange, SlaveAddr,
+    DataRate16Bit, FullScaleRange, SlaveAddr,
 };
 pub mod mode;
 pub use mode::*;
@@ -227,7 +229,6 @@ macro_rules! impl_ads1x1x {
             pub(crate) i2c: I2C,
             pub(crate) address: SlaveAddr,
             pub(crate) config: Config,
-            pub(crate) a_conversion_was_started: bool,
             pub(crate) mode: PhantomData<MODE>,
         }
 
@@ -238,7 +239,6 @@ macro_rules! impl_ads1x1x {
                     i2c,
                     address,
                     config: Config::default(),
-                    a_conversion_was_started: false,
                     mode: PhantomData,
                 }
             }
@@ -252,16 +252,17 @@ macro_rules! impl_ads1x1x {
                 let mut buf = [0, 0];
                 self.i2c
                     .write_read(self.address.bits(), &[R::ADDR], &mut buf)
-                    .map_err(Error::I2C)?;
+                    .map_err(Error::Bus)?;
                 Ok(R::from_reg(u16::from_be_bytes(buf)))
             }
 
             pub(crate) fn write_reg_u16<R: Reg<u16>>(&mut self, reg: R) -> Result<(), Error<E>> {
                 let buf = reg.to_reg().to_be_bytes();
                 let payload: [u8; 3] = [R::ADDR, buf[0], buf[1]];
-                self.i2c
+                Ok(self
+                    .i2c
                     .write(self.address.bits(), &payload)
-                    .map_err(Error::I2C)
+                    .map_err(Error::Bus)?)
             }
         }
 

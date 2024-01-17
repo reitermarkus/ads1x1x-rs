@@ -1,3 +1,5 @@
+use crate::FullScaleRange;
+
 pub trait Reg<R>
 where
     Self: Sized,
@@ -84,14 +86,39 @@ impl Conversion12 {
         (value << 4) as u16
     }
 
-    pub const fn convert_measurement(register_data: u16) -> i16 {
-        let value = register_data;
-        let is_negative = (value & 0b1000_0000_0000_0000) != 0;
-        if is_negative {
-            let value = 0b1111_0000_0000_0000 | (value >> 4);
-            value as i16
+    pub fn convert_measurement(self) -> i16 {
+        let value = self.0 >> 4;
+        let is_negative = value >> 11;
+        ((0b1111_0000_0000_0000 * is_negative) | value) as i16
+    }
+
+    pub fn nv(self, fsr: FullScaleRange) -> i64 {
+        let data = self.convert_measurement() as i64 * fsr.mv() as i64 * 1_000_000;
+
+        if data <= 0 {
+            data / (1 << 11)
         } else {
-            (value >> 4) as i16
+            data / ((1 << 11) - 1)
+        }
+    }
+
+    pub fn uv(self, fsr: FullScaleRange) -> i32 {
+        let data = self.convert_measurement() as i64 * fsr.mv() as i64 * 1_000;
+
+        if data <= 0 {
+            (data / (1 << 11)) as i32
+        } else {
+            (data / ((1 << 11) - 1)) as i32
+        }
+    }
+
+    pub fn mv(self, fsr: FullScaleRange) -> i16 {
+        let data = self.convert_measurement() as i32 * fsr.mv();
+
+        if data <= 0 {
+            (data / (1 << 11)) as i16
+        } else {
+            (data / ((1 << 11) - 1)) as i16
         }
     }
 }
@@ -106,8 +133,38 @@ impl Conversion16 {
         value as u16
     }
 
-    pub const fn convert_measurement(register_data: u16) -> i16 {
-        register_data as i16
+    pub const fn convert_measurement(self) -> i16 {
+        self.0 as i16
+    }
+
+    pub const fn nv(self, fsr: FullScaleRange) -> i64 {
+        let data = self.convert_measurement() as i64 * fsr.mv() as i64 * 1_000_000;
+
+        if data <= 0 {
+            data / (1 << 15)
+        } else {
+            data / ((1 << 15) - 1)
+        }
+    }
+
+    pub const fn uv(self, fsr: FullScaleRange) -> i32 {
+        let data = self.convert_measurement() as i64 * fsr.mv() as i64 * 1_000;
+
+        if data <= 0 {
+            (data / (1 << 15)) as i32
+        } else {
+            (data / ((1 << 15) - 1)) as i32
+        }
+    }
+
+    pub const fn mv(self, fsr: FullScaleRange) -> i16 {
+        let data = self.convert_measurement() as i32 * fsr.mv() as i32;
+
+        if data <= 0 {
+            (data / (1 << 15)) as i16
+        } else {
+            (data / ((1 << 15) - 1)) as i16
+        }
     }
 }
 
@@ -185,18 +242,96 @@ mod tests {
 
     #[test]
     fn convert_measurement_12bit() {
-        assert_eq!(0, Conversion12::convert_measurement(0));
-        assert_eq!(2047, Conversion12::convert_measurement(0x7FFF));
-        assert_eq!(-2048, Conversion12::convert_measurement(0x8000));
-        assert_eq!(-1, Conversion12::convert_measurement(0xFFFF));
+        assert_eq!(0, Conversion12(0).convert_measurement());
+        assert_eq!(2047, Conversion12(0x7FFF).convert_measurement());
+        assert_eq!(-2048, Conversion12(0x8000).convert_measurement());
+        assert_eq!(-1, Conversion12(0xFFFF).convert_measurement());
+    }
+
+    #[test]
+    fn convert_nv_12bit() {
+        assert_eq!(0, Conversion12(0).nv(FullScaleRange::Within6_144V));
+        assert_eq!(
+            6144_000_000,
+            Conversion12(0x7FFF).nv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -6144_000_000,
+            Conversion12(0x8000).nv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -3_000_000,
+            Conversion12(0xFFFF).nv(FullScaleRange::Within6_144V)
+        );
+    }
+
+    #[test]
+    fn convert_uv_12bit() {
+        assert_eq!(0, Conversion12(0).uv(FullScaleRange::Within6_144V));
+        assert_eq!(
+            6144_000,
+            Conversion12(0x7FFF).uv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -6144_000,
+            Conversion12(0x8000).uv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(-3000, Conversion12(0xFFFF).uv(FullScaleRange::Within6_144V));
+    }
+
+    #[test]
+    fn convert_mv_12bit() {
+        assert_eq!(0, Conversion12(0).mv(FullScaleRange::Within6_144V));
+        assert_eq!(6144, Conversion12(0x7FFF).mv(FullScaleRange::Within6_144V));
+        assert_eq!(-6144, Conversion12(0x8000).mv(FullScaleRange::Within6_144V));
+        assert_eq!(-3, Conversion12(0xFFFF).mv(FullScaleRange::Within6_144V));
     }
 
     #[test]
     fn convert_measurement_16bit() {
-        assert_eq!(0, Conversion16::convert_measurement(0));
-        assert_eq!(32767, Conversion16::convert_measurement(0x7FFF));
-        assert_eq!(-32768, Conversion16::convert_measurement(0x8000));
-        assert_eq!(-1, Conversion16::convert_measurement(0xFFFF));
+        assert_eq!(0, Conversion16(0).convert_measurement());
+        assert_eq!(32767, Conversion16(0x7FFF).convert_measurement());
+        assert_eq!(-32768, Conversion16(0x8000).convert_measurement());
+        assert_eq!(-1, Conversion16(0xFFFF).convert_measurement());
+    }
+
+    #[test]
+    fn convert_nv_16bit() {
+        assert_eq!(0, Conversion16(0).nv(FullScaleRange::Within6_144V));
+        assert_eq!(
+            6144_000_000,
+            Conversion16(0x7FFF).nv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -6144_000_000,
+            Conversion16(0x8000).nv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -187_500,
+            Conversion16(0xFFFF).nv(FullScaleRange::Within6_144V)
+        );
+    }
+
+    #[test]
+    fn convert_uv_16bit() {
+        assert_eq!(0, Conversion16(0).uv(FullScaleRange::Within6_144V));
+        assert_eq!(
+            6144_000,
+            Conversion16(0x7FFF).uv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(
+            -6144_000,
+            Conversion16(0x8000).uv(FullScaleRange::Within6_144V)
+        );
+        assert_eq!(-187, Conversion16(0xFFFF).uv(FullScaleRange::Within6_144V));
+    }
+
+    #[test]
+    fn convert_mv_16bit() {
+        assert_eq!(0, Conversion16(0).mv(FullScaleRange::Within6_144V));
+        assert_eq!(6144, Conversion16(0x7FFF).mv(FullScaleRange::Within6_144V));
+        assert_eq!(-6144, Conversion16(0x8000).mv(FullScaleRange::Within6_144V));
+        assert_eq!(0, Conversion16(0xFFFF).mv(FullScaleRange::Within6_144V));
     }
 
     #[test]

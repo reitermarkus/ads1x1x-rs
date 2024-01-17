@@ -2,15 +2,6 @@
 
 use crate::Config;
 
-/// Errors in this crate
-#[derive(Debug, PartialEq)]
-pub enum Error<E> {
-    /// I²C bus error
-    I2C(E),
-    /// Invalid input data provided
-    InvalidInputData,
-}
-
 /// Data rate for ADS101x.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum DataRate12Bit {
@@ -238,6 +229,34 @@ impl FullScaleRange {
                 .union(Config::PGA2)
                 .difference(Config::PGA1)
                 .union(Config::PGA0),
+        }
+    }
+
+    pub(crate) const fn mv(self) -> i32 {
+        match self {
+            Self::Within6_144V => 6144,
+            Self::Within4_096V => 4096,
+            Self::Within2_048V => 2048,
+            Self::Within1_024V => 1024,
+            Self::Within0_512V => 512,
+            Self::Within0_256V => 256,
+        }
+    }
+}
+
+impl From<Config> for FullScaleRange {
+    fn from(config: Config) -> Self {
+        match (
+            config.contains(Config::PGA2),
+            config.contains(Config::PGA1),
+            config.contains(Config::PGA0),
+        ) {
+            (false, false, false) => Self::Within6_144V,
+            (false, false, true) => Self::Within4_096V,
+            (false, true, false) => Self::Within2_048V,
+            (false, true, true) => Self::Within1_024V,
+            (true, false, false) => Self::Within0_512V,
+            (true, _, _) => Self::Within0_256V,
         }
     }
 }

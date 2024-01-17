@@ -20,6 +20,10 @@ include = [
 ]
 edition = "2021"
 
+[features]
+default = []
+std = []
+
 [dependencies]
 bitflags = "2"
 embedded-hal = "1"
@@ -33,3 +37,6 @@ linux-embedded-hal = "0.4"
 
 [profile.release]
 lto = true
+
+[patch.crates-io]
+embedded-hal = { path = "../embedded-hal/embedded-hal" }

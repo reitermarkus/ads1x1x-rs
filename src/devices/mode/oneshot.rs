@@ -1,11 +1,11 @@
 //! One-shot measurement mode.
 
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     mode,
     register::{Config, Conversion12, Conversion16},
-    Ads1013, Ads1014, Ads1015, Ads1113, Ads1114, Ads1115, ChannelId, Error,
+    Ads1013, Ads1014, Ads1015, Ads1113, Ads1114, Ads1115, Channel, Error, FullScaleRange,
 };
 
 macro_rules! impl_one_shot {
@@ -28,49 +28,83 @@ macro_rules! impl_one_shot {
                     i2c: self.i2c,
                     address: self.address,
                     config,
-                    a_conversion_was_started: true,
                     mode: PhantomData,
                 })
             }
 
-            fn trigger_measurement(&mut self, config: &Config) -> Result<(), Error<E>> {
+            pub(crate) fn trigger_measurement(&mut self, config: &Config) -> Result<(), Error<E>> {
                 let config = config.union(Config::OS);
                 self.write_reg_u16(config)
             }
 
-            /// Requests that the ADC begins a conversion on the specified channel.
-            ///
-            /// The output value will be within `[2047..-2048]` for 12-bit devices
-            /// (`ADS101x`) and within `[32767..-32768]` for 16-bit devices (`ADS111x`).
-            /// The voltage that these values correspond to must be calculated using
-            /// the full-scale range ([`FullScaleRange`](crate::FullScaleRange)) selected.
-            ///
-            /// Returns `nb::Error::WouldBlock` while a measurement is in progress.
-            ///
-            /// In case a measurement was requested and after is it is finished a
-            /// measurement on a different channel is requested, a new measurement on
-            /// using the new channel selection is triggered.
-            #[allow(unused_variables)]
-            pub fn read<CH: ChannelId<Self>>(&mut self, channel: CH) -> nb::Result<i16, Error<E>> {
-                if self
-                    .is_measurement_in_progress()
-                    .map_err(nb::Error::Other)?
-                {
-                    return Err(nb::Error::WouldBlock);
+            pub(crate) fn measure_raw(&mut self) -> Result<$conv, Error<E>> {
+                let config = self.config;
+                self.trigger_measurement(&config)?;
+
+                while self.is_measurement_in_progress()? {
+                    core::hint::spin_loop();
                 }
-                let config = self.config.with_mux_bits(CH::channel_id());
-                let same_channel = self.config == config;
-                if self.a_conversion_was_started && same_channel {
-                    // result is ready
-                    let value = self.read_reg_u16::<$conv>().map_err(nb::Error::Other)?;
-                    self.a_conversion_was_started = false;
-                    return Ok(<$conv>::convert_measurement(value.0));
-                }
-                self.trigger_measurement(&config)
-                    .map_err(nb::Error::Other)?;
-                self.config = config;
-                self.a_conversion_was_started = true;
-                Err(nb::Error::WouldBlock)
+
+                self.read_reg_u16()
+            }
+
+            /// Requests a new conversion and waits for it to complete.
+            pub fn measure(&mut self) -> Result<i16, Error<E>> {
+                Ok(self.read_reg_u16::<$conv>()?.convert_measurement())
+            }
+        }
+
+        impl<I2C, E> embedded_hal::adc::Voltmeter for Channel<$Ads<I2C, mode::OneShot>>
+        where
+            I2C: embedded_hal::i2c::I2c<Error = E>,
+            E: embedded_hal::i2c::Error + Debug,
+        {
+            fn measure_nv(&mut self) -> Result<i64, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .nv(FullScaleRange::from(self.adc.config)))
+            }
+
+            fn measure_uv(&mut self) -> Result<i32, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .uv(FullScaleRange::from(self.adc.config)))
+            }
+
+            fn measure_mv(&mut self) -> Result<i16, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .mv(FullScaleRange::from(self.adc.config)))
+            }
+        }
+
+        impl<I2C, E> embedded_hal::adc::Voltmeter for Channel<&mut $Ads<I2C, mode::OneShot>>
+        where
+            I2C: embedded_hal::i2c::I2c<Error = E>,
+            E: embedded_hal::i2c::Error + Debug,
+        {
+            fn measure_nv(&mut self) -> Result<i64, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .nv(FullScaleRange::from(self.adc.config)))
+            }
+
+            fn measure_uv(&mut self) -> Result<i32, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .uv(FullScaleRange::from(self.adc.config)))
+            }
+
+            fn measure_mv(&mut self) -> Result<i16, Self::Error> {
+                Ok(self
+                    .adc
+                    .measure_raw()?
+                    .mv(FullScaleRange::from(self.adc.config)))
             }
         }
     };
